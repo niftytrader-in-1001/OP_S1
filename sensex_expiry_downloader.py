@@ -317,7 +317,11 @@ def main():
     # =========================================================
     # 2️⃣ ALWAYS-RUN JOB  (⬅️ YOUR NEW BLOCK GOES HERE)
     # =========================================================
-    send_15min_last_4weeks_csv(smart)
+    try:
+        send_15min_last_4weeks_csv(smart)
+    except Exception as e:
+        logger.error(f"15-min CSV failed: {e}")
+
     
     df_master = load_symbol_master()
     is_expiry, expiry = is_today_SENSEX_expiry(df_master)
