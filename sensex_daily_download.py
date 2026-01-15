@@ -256,67 +256,6 @@ def download_symbol(args):
 
     return symbol, None, "No data"
 
-
-def send_15min_last_4weeks_csv(smart):
-
-    # =========================================================
-    # SAFETY CHECK – TELEGRAM CREDS
-    # =========================================================
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        logger.error("❌ Telegram credentials missing – skipping CSV send")
-        return
-
-    INTERVAL = "FIFTEEN_MINUTE"
-    FILE_NAME = "data_15min_last_4_weeks.csv"
-
-    EXCHANGE = "BSE"
-    SYMBOL_TOKEN = SENSEX_TOKEN
-
-    to_date = datetime.now(IST)
-    from_date = to_date - timedelta(weeks=4)
-
-    FROM_DATE = from_date.strftime("%Y-%m-%d %H:%M")
-    TO_DATE = to_date.strftime("%Y-%m-%d %H:%M")
-
-    logger.info("📥 Fetching 15-min candles for last 4 weeks")
-
-    resp = smart.getCandleData({
-        "exchange": EXCHANGE,
-        "symboltoken": SYMBOL_TOKEN,
-        "interval": INTERVAL,
-        "fromdate": FROM_DATE,
-        "todate": TO_DATE
-    })
-
-    if not resp or not resp.get("status") or not resp.get("data"):
-        logger.error("❌ No 15-min candle data received")
-        return
-
-    df = pd.DataFrame(
-        resp["data"],
-        columns=["Date", "Open", "High", "Low", "Close", "Volume"]
-    )
-
-    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
-    df.drop_duplicates(subset=["Date"], inplace=True)
-
-    logger.info(f"✅ 15-min candles fetched: {len(df)}")
-
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-    csv_buffer.seek(0)
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
-    files = {"document": (FILE_NAME, csv_buffer.getvalue())}
-    data = {"chat_id": TELEGRAM_CHAT_ID}
-
-    r = requests.post(url, files=files, data=data, timeout=120)
-    r.raise_for_status()
-
-    logger.info("📤 15-min CSV sent to Telegram")
-
-
-
 # =========================================================
 # MAIN
 # =========================================================
@@ -326,15 +265,7 @@ def main():
     login = smart.generateSession(ANGEL_CLIENT_ID, ANGEL_PIN, totp)
     if not login or not login.get("status"):
         raise RuntimeError("Login failed")
-    # =========================================================
-    # 2️⃣ ALWAYS-RUN JOB  (⬅️ YOUR NEW BLOCK GOES HERE)
-    # =========================================================
-    try:
-        send_15min_last_4weeks_csv(smart)
-    except Exception as e:
-        logger.error(f"15-min CSV failed: {e}")
 
-    
     df_master = load_symbol_master()
     is_expiry, expiry = is_today_SENSEX_expiry(df_master)
     if not is_expiry:
