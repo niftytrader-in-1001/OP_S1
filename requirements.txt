@@ -1,0 +1,9 @@
+pandas
+numpy
+requests
+python-dotenv
+pyotp
+openpyxl
+urllib3
+smartapi-python
+logzero
