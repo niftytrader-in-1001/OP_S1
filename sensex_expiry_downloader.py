@@ -37,19 +37,6 @@ ANGEL_TOTP = os.getenv("ANGEL_TOTP")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# Replace lines 40-52 with:
-logger.info(
-    "Angel ENV present: %s",
-    {
-        "API_KEY": bool(ANGEL_API_KEY),
-        "CLIENT_ID": bool(ANGEL_CLIENT_ID),
-        "PIN": bool(ANGEL_PIN),
-        "TOTP": bool(ANGEL_TOTP),
-        "TG_TOKEN": bool(TELEGRAM_BOT_TOKEN),
-        "TG_CHAT": bool(TELEGRAM_CHAT_ID),
-    }
-)
-
 # Allow script to continue even if TOTP is missing for debugging
 if not all([ANGEL_API_KEY, ANGEL_CLIENT_ID, ANGEL_PIN]):
     raise RuntimeError("❌ Missing critical Angel One credentials")
