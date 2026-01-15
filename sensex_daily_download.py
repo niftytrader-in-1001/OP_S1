@@ -35,7 +35,7 @@ ANGEL_PIN = os.getenv("ANGEL_PIN")
 ANGEL_TOTP = os.getenv("ANGEL_TOTP")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID_SENSEX")
 
 # Allow script to continue even if TOTP is missing for debugging
 if not all([ANGEL_API_KEY, ANGEL_CLIENT_ID, ANGEL_PIN]):
