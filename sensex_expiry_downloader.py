@@ -61,7 +61,72 @@ IST = timezone(timedelta(hours=5, minutes=30))
 WEEKS_FOR_RANGE = 4
 SENSEX_TOKEN = "99919000"
 SENSEX_STRIKE_MULTIPLE = 100
+#==========================================================
+INTERVAL = "FIFTEEN_MINUTE"
 
+FILE_NAME = "data_15min_last_4_weeks.csv"
+
+# ===============================
+# DATE RANGE (PAST 4 WEEKS)
+# ===============================
+to_date = datetime.now(IST)
+from_date = to_date - timedelta(weeks=4)
+
+FROM_DATE = from_date.strftime("%Y-%m-%d %H:%M")
+TO_DATE = to_date.strftime("%Y-%m-%d %H:%M")
+
+# ===============================
+# FETCH CANDLES
+# ===============================
+print("📥 Fetching candles...")
+
+resp = smart.getCandleData({
+    "exchange": EXCHANGE,
+    "symboltoken": SYMBOL_TOKEN,
+    "interval": INTERVAL,
+    "fromdate": FROM_DATE,
+    "todate": TO_DATE
+})
+
+if not resp or not resp.get("status") or not resp.get("data"):
+    raise Exception("❌ No candle data received")
+
+df = pd.DataFrame(
+    resp["data"],
+    columns=["Date", "Open", "High", "Low", "Close", "Volume"]
+)
+
+df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
+df.drop_duplicates(subset=["Date"], inplace=True)
+
+print(f"✅ Candles fetched: {len(df)}")
+
+# ===============================
+# CSV → MEMORY
+# ===============================
+csv_buffer = io.StringIO()
+df.to_csv(csv_buffer, index=False)
+csv_buffer.seek(0)
+
+# ===============================
+# SEND TO TELEGRAM
+# ===============================
+print("📤 Sending CSV to Telegram...")
+
+url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
+files = {
+    "document": (FILE_NAME, csv_buffer.getvalue())
+}
+data = {
+    "chat_id": TELEGRAM_CHAT_ID
+}
+
+r = requests.post(url, files=files, data=data, timeout=120)
+r.raise_for_status()
+
+print("🎯 DONE — CSV sent to Telegram")
+
+#==================================
 # =========================================================
 # THREAD SAFE GLOBALS
 # =========================================================
