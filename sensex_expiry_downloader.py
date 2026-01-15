@@ -255,12 +255,22 @@ def download_symbol(args):
         return symbol, buf.getvalue(), None
 
     return symbol, None, "No data"
+
+
 def send_15min_last_4weeks_csv(smart):
+
+    # =========================================================
+    # SAFETY CHECK – TELEGRAM CREDS
+    # =========================================================
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        logger.error("❌ Telegram credentials missing – skipping CSV send")
+        return
+
     INTERVAL = "FIFTEEN_MINUTE"
     FILE_NAME = "data_15min_last_4_weeks.csv"
 
-    EXCHANGE = "BSE"              # or NSE
-    SYMBOL_TOKEN = SENSEX_TOKEN   # reuse existing constant
+    EXCHANGE = "BSE"
+    SYMBOL_TOKEN = SENSEX_TOKEN
 
     to_date = datetime.now(IST)
     from_date = to_date - timedelta(weeks=4)
@@ -279,7 +289,8 @@ def send_15min_last_4weeks_csv(smart):
     })
 
     if not resp or not resp.get("status") or not resp.get("data"):
-        raise RuntimeError("❌ No 15-min candle data received")
+        logger.error("❌ No 15-min candle data received")
+        return
 
     df = pd.DataFrame(
         resp["data"],
@@ -303,6 +314,7 @@ def send_15min_last_4weeks_csv(smart):
     r.raise_for_status()
 
     logger.info("📤 15-min CSV sent to Telegram")
+
 
 
 # =========================================================
