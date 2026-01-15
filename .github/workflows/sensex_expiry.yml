@@ -14,23 +14,6 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🔍 Debug Environment Variables (Safe)
-        env:
-          ANGEL_API_KEY: ${{ secrets.ANGEL_API_KEY }}
-          ANGEL_CLIENT_ID: ${{ secrets.ANGEL_CLIENT_ID }}
-          ANGEL_PIN: ${{ secrets.ANGEL_PIN }}
-          ANGEL_TOTP: ${{ secrets.ANGEL_TOTP }}
-        run: |
-          echo "ANGEL_API_KEY exists: ${{ secrets.ANGEL_API_KEY != '' }}"
-          echo "ANGEL_CLIENT_ID exists: ${{ secrets.ANGEL_CLIENT_ID != '' }}"
-          echo "ANGEL_PIN exists: ${{ secrets.ANGEL_PIN != '' }}"
-          echo "ANGEL_TOTP exists: ${{ secrets.ANGEL_TOTP != '' }}"
-          echo "TELEGRAM_BOT_TOKEN exists: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}"
-          echo "TELEGRAM_CHAT_ID exists: ${{ secrets.TELEGRAM_CHAT_ID != '' }}"
-          
-          # Show lengths (safely)
-          echo "ANGEL_TOTP length: ${#ANGEL_TOTP}"
-
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
