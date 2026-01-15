@@ -15,6 +15,8 @@ import numpy as np
 import tempfile
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import math
+
 
 # =========================================================
 # LOGGING (reduced noise for GitHub Actions)
@@ -75,8 +77,12 @@ total_symbols = 0
 # =========================================================
 # UTILS
 # =========================================================
-def round_to_nearest_50(price):
-    return round(price / 50) * 50
+def round_down_to_50(price):
+    return math.floor(price / 50) * 50
+
+def round_up_to_50(price):
+    return math.ceil(price / 50) * 50
+
 
 
 # =========================================================
@@ -138,8 +144,9 @@ def calculate_strike_range(smart_api, buffer=500):
         logger.error("❌ Historical data unavailable, aborting safely")
         sys.exit(1)
 
-    start = round_to_nearest_50(hist["min_low"] - buffer)
-    end = round_to_nearest_50(hist["max_high"] + buffer)
+    start = round_down_to_50(hist["min_low"] - buffer)
+    end = round_up_to_50(hist["max_high"] + buffer)
+
     return max(0, start), end
 
 
