@@ -8,6 +8,7 @@ REQ_FILE = Path("requirements.txt")
 IMPORT_ALIASES = {
     "python-dotenv": "dotenv",
     "smartapi-python": "SmartApi",
+    "websocket-client": "websocket",
     "logzero": "logzero"
 }
 
@@ -51,3 +52,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
