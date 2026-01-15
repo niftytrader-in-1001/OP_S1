@@ -6,4 +6,5 @@ pyotp
 openpyxl
 urllib3
 smartapi-python
+websocket-client
 logzero
