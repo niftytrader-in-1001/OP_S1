@@ -1,0 +1,36 @@
+name: Nifty Expiry Auto Downloader
+
+on:
+  schedule:
+    - cron: '15 10 * * 1-5'   # 15:45 IST (Mon–Fri)
+  workflow_dispatch:
+
+jobs:
+  run-nifty:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt
+
+      - name: 🚀 Run NIFTY expiry downloader
+        env:
+          ANGEL_API_KEY: ${{ secrets.ANGEL_API_KEY }}
+          ANGEL_CLIENT_ID: ${{ secrets.ANGEL_CLIENT_ID }}
+          ANGEL_PIN: ${{ secrets.ANGEL_PIN }}
+          ANGEL_TOTP: ${{ secrets.ANGEL_TOTP }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_NIFTY: ${{ secrets.TELEGRAM_CHAT_ID_NIFTY }}
+        run: |
+          python nifty_daily_download.py
