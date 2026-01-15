@@ -2,7 +2,7 @@ name: SENSEX Expiry Auto Downloader
 
 on:
   schedule:
-    - cron: '30 10 * * 1-5'   # 16:30 IST (Mon–Fri)
+    - cron: '00 11 * * 1-5'   # 16:30 IST (Mon–Fri)
   workflow_dispatch:
 
 jobs:
