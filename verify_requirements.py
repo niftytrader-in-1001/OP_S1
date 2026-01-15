@@ -1,19 +1,19 @@
 import sys
 import importlib
 from pathlib import Path
-from packaging.requirements import Requirement
 
 REQ_FILE = Path("requirements.txt")
 
+# Canonical normalized aliases
 IMPORT_ALIASES = {
-    "python-dotenv": "dotenv",
-    "smartapi-python": "SmartApi",
-    "websocket-client": "websocket",
+    "python_dotenv": "dotenv",
+    "smartapi_python": "SmartApi",
+    "websocket_client": "websocket",
     "logzero": "logzero",
 }
 
 def normalize(pkg):
-    return pkg.replace("-", "_").lower()
+    return pkg.strip().lower().replace("-", "_")
 
 def main():
     if not REQ_FILE.exists():
@@ -21,36 +21,29 @@ def main():
         sys.exit(1)
 
     failed = []
-    packages = []
 
     with open(REQ_FILE) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-
-            try:
-                req = Requirement(line)
-                packages.append(req.name)
-            except Exception as e:
-                print(f"❌ Invalid requirement line: {line} ({e})")
-                sys.exit(1)
+        packages = [
+            normalize(line)
+            for line in f
+            if line.strip() and not line.startswith("#")
+        ]
 
     print("\n📦 Verifying installed packages...\n")
 
     for pkg in packages:
-        module = IMPORT_ALIASES.get(pkg, normalize(pkg))
+        module = IMPORT_ALIASES.get(pkg, pkg)
         try:
             importlib.import_module(module)
-            print(f"✅ {pkg} -> OK")
+            print(f"✅ {pkg.replace('_','-')} -> OK")
         except Exception as e:
-            print(f"❌ {pkg} -> FAILED ({e})")
+            print(f"❌ {pkg.replace('_','-')} -> FAILED ({e})")
             failed.append(pkg)
 
     if failed:
         print("\n❌ Installation verification failed for:")
         for f in failed:
-            print(f"   - {f}")
+            print(f"   - {f.replace('_','-')}")
         sys.exit(1)
 
     print("\n🎉 All packages installed and importable successfully!")
