@@ -1,15 +1,15 @@
 import sys
 import importlib
 from pathlib import Path
+from packaging.requirements import Requirement
 
 REQ_FILE = Path("requirements.txt")
 
-# Some packages have different import names
 IMPORT_ALIASES = {
     "python-dotenv": "dotenv",
     "smartapi-python": "SmartApi",
     "websocket-client": "websocket",
-    "logzero": "logzero"
+    "logzero": "logzero",
 }
 
 def normalize(pkg):
@@ -28,8 +28,13 @@ def main():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            pkg = line.split("==")[0]
-            packages.append(pkg)
+
+            try:
+                req = Requirement(line)
+                packages.append(req.name)
+            except Exception as e:
+                print(f"❌ Invalid requirement line: {line} ({e})")
+                sys.exit(1)
 
     print("\n📦 Verifying installed packages...\n")
 
@@ -52,4 +57,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
