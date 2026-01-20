@@ -255,7 +255,7 @@ def download_symbol(args):
             r["data"],
             columns=["Date","Open","High","Low","Close","Volume"]
         )
-        df["Date"] = pd.to_datetime(df["Date"])
+        df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as w:
             df.to_excel(w, index=False)
