@@ -102,17 +102,28 @@ def get_SENSEX_historical_data(smart_api, weeks=4):
                 resp["data"],
                 columns=["Date", "Open", "High", "Low", "Close", "Volume"]
             )
-			df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-			if df["Date"].dt.tz is not None:
-				df["Date"] = df["Date"].dt.tz_localize(None)
+
+            # Parse dates safely
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+            # Drop rows with invalid dates
+            df = df.dropna(subset=["Date"])
+
+            # If timezone-aware, convert to naive
+            if df["Date"].dt.tz is not None:
+                df["Date"] = df["Date"].dt.tz_convert(None)
+
+            if df.empty:
+                return None
+
             return {
-                "min_low": df["Low"].min(),
-                "max_high": df["High"].max(),
-                "current_close": df["Close"].iloc[-1]
+                "min_low": float(df["Low"].min()),
+                "max_high": float(df["High"].max()),
+                "current_close": float(df["Close"].iloc[-1])
             }
 
     except Exception as e:
-        logger.error(f"SENSEX historical error: {e}")
+        logger.error(f"SENSEX historical error: {e}", exc_info=True)
 
     return None
 
@@ -230,7 +241,6 @@ def get_candles_with_retry(smart, params):
             time.sleep((i + 1) * 5)
     return None
 
-
 def download_symbol(args):
     smart, row, FROM, TO = args
     symbol = row["TradingSymbol"]
@@ -244,19 +254,38 @@ def download_symbol(args):
         "todate": TO,
     }
 
-    r = get_candles_with_retry(smart, params)
-    if r and r.get("data"):
+    try:
+        r = get_candles_with_retry(smart, params)
+
+        if not r or not r.get("data"):
+            return symbol, None, "No data"
+
         df = pd.DataFrame(
             r["data"],
-            columns=["Date","Open","High","Low","Close","Volume"]
+            columns=["Date", "Open", "High", "Low", "Close", "Volume"]
         )
-        df["Date"] = pd.to_datetime(df["Date"])
+
+        # Safe datetime parsing
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+        # Drop bad rows
+        df = df.dropna(subset=["Date"])
+
+        # Normalize timezone if present
+        if df["Date"].dt.tz is not None:
+            df["Date"] = df["Date"].dt.tz_convert(None)
+
+        if df.empty:
+            return symbol, None, "Empty dataframe after parsing"
+
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as w:
-            df.to_excel(w, index=False)
+            df.to_excel(w, index=False, sheet_name=symbol[:31])
+
         return symbol, buf.getvalue(), None
 
-    return symbol, None, "No data"
+    except Exception as e:
+        return symbol, None, str(e)
 
 # =========================================================
 # MAIN
