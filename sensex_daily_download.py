@@ -102,7 +102,9 @@ def get_SENSEX_historical_data(smart_api, weeks=4):
                 resp["data"],
                 columns=["Date", "Open", "High", "Low", "Close", "Volume"]
             )
-            df["Date"] = pd.to_datetime(df["Date"])
+			df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+			if df["Date"].dt.tz is not None:
+				df["Date"] = df["Date"].dt.tz_localize(None)
             return {
                 "min_low": df["Low"].min(),
                 "max_high": df["High"].max(),
