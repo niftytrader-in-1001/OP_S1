@@ -60,7 +60,7 @@ MAX_RETRIES = 3
 MAX_WORKERS = 3
 IST = timezone(timedelta(hours=5, minutes=30))
 
-WEEKS_FOR_RANGE = 4
+WEEKS_FOR_RANGE = 6
 NIFTY_TOKEN = "99926000"
 NIFTY_STRIKE_MULTIPLE = 50
 # =========================================================
@@ -88,7 +88,7 @@ def round_up_to_50(price):
 # =========================================================
 # NIFTY DATA
 # =========================================================
-def get_NIFTY_historical_data(smart_api, weeks=4):
+def get_NIFTY_historical_data(smart_api, weeks=6):
     try:
         to_date = datetime.now(IST)
         from_date = to_date - timedelta(weeks=weeks)
