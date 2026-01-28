@@ -60,9 +60,30 @@ MAX_RETRIES = 3
 MAX_WORKERS = 3
 IST = timezone(timedelta(hours=5, minutes=30))
 
-WEEKS_FOR_RANGE = 4
-NIFTYBANK_TOKEN = "99926009"
-NIFTYBANK_STRIKE_MULTIPLE = 100
+WEEKS_FOR_RANGE = 6
+
+# Symbol configuration
+SYMBOL_CONFIG = {
+    "BANKNIFTY": {
+        "token": "99926009",
+        "strike_multiple": 100,
+        "round_function": 100,
+        "buffer": 1000
+    },
+    "FINNIFTY": {
+        "token": "99926037",
+        "strike_multiple": 50,
+        "round_function": 50,
+        "buffer": 500
+    },
+    "MIDCPNIFTY": {
+        "token": "99926074",
+        "strike_multiple": 25,
+        "round_function": 25,
+        "buffer": 150
+    }
+}
+
 # =========================================================
 # THREAD SAFE GLOBALS
 # =========================================================
@@ -77,25 +98,23 @@ total_symbols = 0
 # =========================================================
 # UTILS
 # =========================================================
-def round_down_to_100(price):
-    return math.floor(price / 100) * 100
+def round_down_to_multiple(price, multiple):
+    return math.floor(price / multiple) * multiple
 
-def round_up_to_100(price):
-    return math.ceil(price / 100) * 100
-
-
+def round_up_to_multiple(price, multiple):
+    return math.ceil(price / multiple) * multiple
 
 # =========================================================
-# NIFTYBANK DATA
+# HISTORICAL DATA FOR EACH SYMBOL
 # =========================================================
-def get_NIFTYBANK_historical_data(smart_api, weeks=6):
+def get_historical_data(smart_api, symbol_token, weeks=6):
     try:
         to_date = datetime.now(IST)
         from_date = to_date - timedelta(weeks=weeks)
 
         params = {
             "exchange": "NSE",
-            "symboltoken": NIFTYBANK_TOKEN,
+            "symboltoken": symbol_token,
             "interval": "ONE_DAY",
             "fromdate": from_date.strftime("%Y-%m-%d 09:15"),
             "todate": to_date.strftime("%Y-%m-%d %H:%M"),
@@ -116,16 +135,16 @@ def get_NIFTYBANK_historical_data(smart_api, weeks=6):
             }
 
     except Exception as e:
-        logger.error(f"NIFTYBANK historical error: {e}")
+        logger.error(f"{symbol_token} historical error: {e}")
 
     return None
 
 
-def get_NIFTYBANK_ltp(smart_api):
+def get_ltp(smart_api, symbol_token):
     try:
         params = {
             "exchange": "NSE",
-            "symboltoken": NIFTYBANK_TOKEN,
+            "symboltoken": symbol_token,
             "interval": "ONE_MINUTE",
             "fromdate": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d 09:15"),
             "todate": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -138,14 +157,18 @@ def get_NIFTYBANK_ltp(smart_api):
     return None
 
 
-def calculate_strike_range(smart_api, buffer=1000):
-    hist = get_NIFTYBANK_historical_data(smart_api, WEEKS_FOR_RANGE)
+def calculate_strike_range(smart_api, symbol_config, buffer=None):
+    if buffer is None:
+        buffer = symbol_config["buffer"]
+    
+    hist = get_historical_data(smart_api, symbol_config["token"], WEEKS_FOR_RANGE)
     if not hist:
-        logger.error("❌ Historical data unavailable, aborting safely")
-        sys.exit(1)
+        logger.error(f"❌ Historical data unavailable for {symbol_config['token']}")
+        return None, None
 
-    start = round_down_to_100(hist["min_low"] - buffer)
-    end = round_up_to_100(hist["max_high"] + buffer)
+    multiple = symbol_config["round_function"]
+    start = round_down_to_multiple(hist["min_low"] - buffer, multiple)
+    end = round_up_to_multiple(hist["max_high"] + buffer, multiple)
 
     return max(0, start), end
 
@@ -166,17 +189,17 @@ def load_symbol_master():
             return pd.read_csv(io.StringIO(content))
 
 
-def is_today_NIFTYBANK_expiry(df):
+def is_today_expiry(df, symbol):
     today = datetime.now(IST).date()
-    df = df[(df["Symbol"] == "BANKNIFTY") & (df["Instrument"] == "OPTIDX")].copy()
+    df = df[(df["Symbol"] == symbol) & (df["Instrument"] == "OPTIDX")].copy()
     df["ExpiryDate"] = pd.to_datetime(df["Expiry"], format="%d-%b-%Y").dt.date
     return (today in df["ExpiryDate"].values), today
 
 
-def get_option_symbols(df, expiry_date, start, end):
+def get_option_symbols(df, symbol, expiry_date, start, end, strike_multiple):
     expiry = expiry_date.strftime("%d-%b-%Y").upper()
     df = df[
-        (df["Symbol"] == "BANKNIFTY") &
+        (df["Symbol"] == symbol) &
         (df["Instrument"] == "OPTIDX") &
         (df["Expiry"] == expiry)
     ].copy()
@@ -186,12 +209,12 @@ def get_option_symbols(df, expiry_date, start, end):
     return df[
         (df["StrikePrice"] >= start) &
         (df["StrikePrice"] <= end) &
-        (df["StrikePrice"] % 50 == 0)
+        (df["StrikePrice"] % strike_multiple == 0)
     ]
 
 
 # =========================================================
-# TELEGRAM UPLOAD (UNCHANGED LOGIC)
+# TELEGRAM UPLOAD
 # =========================================================
 def send_zip_to_telegram(zip_bytes, name):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
@@ -213,9 +236,10 @@ def send_zip_to_telegram(zip_bytes, name):
                 timeout=(30, 600),
             )
         r.raise_for_status()
+        logger.info(f"✅ Sent {name} to Telegram")
         return True
     except Exception as e:
-        logger.error(f"Telegram error: {e}")
+        logger.error(f"Telegram error for {name}: {e}")
         return False
     finally:
         os.remove(path)
@@ -263,53 +287,135 @@ def download_symbol(args):
 
     return symbol, None, "No data"
 
+
+# =========================================================
+# PROCESS SINGLE INDEX
+# =========================================================
+def process_index(smart, df_master, symbol_name, symbol_config):
+    """Process a single index and return zip bytes if successful"""
+    logger.info(f"🔍 Processing {symbol_name}...")
+    
+    # Check if today is expiry
+    is_expiry, expiry = is_today_expiry(df_master, symbol_name)
+    if not is_expiry:
+        logger.info(f"📅 Not {symbol_name} expiry day. Skipping.")
+        return None
+    
+    logger.info(f"✅ Today is {symbol_name} expiry day: {expiry}")
+    
+    # Calculate strike range
+    start, end = calculate_strike_range(smart, symbol_config)
+    if start is None or end is None:
+        logger.error(f"❌ Could not calculate strike range for {symbol_name}")
+        return None
+    
+    logger.info(f"📊 {symbol_name} strike range: {start} to {end}")
+    
+    # Get option symbols
+    df = get_option_symbols(
+        df_master, 
+        symbol_name, 
+        expiry, 
+        start, 
+        end, 
+        symbol_config["strike_multiple"]
+    )
+    
+    if df.empty:
+        logger.warning(f"⚠️ No option symbols found for {symbol_name}")
+        return None
+    
+    logger.info(f"📈 Found {len(df)} option symbols for {symbol_name}")
+    
+    # Prepare date range
+    FROM = (expiry - timedelta(days=90)).strftime("%Y-%m-%d 09:15")
+    TO = expiry.strftime("%Y-%m-%d 15:30")
+    
+    # Prepare arguments for parallel download
+    args = [(smart, r, FROM, TO) for _, r in df.iterrows()]
+    
+    # Create zip buffer
+    zip_buf = io.BytesIO()
+    
+    # Track success/failure for this index
+    index_success = []
+    index_failed = []
+    
+    # Download symbols in parallel
+    with concurrent.futures.ThreadPoolExecutor(MAX_WORKERS) as ex:
+        futures = {ex.submit(download_symbol, arg): arg[0] for arg in args}
+        
+        for future in concurrent.futures.as_completed(futures):
+            symbol, data, err = future.result()
+            if data:
+                with zip_lock:
+                    with zipfile.ZipFile(zip_buf, "a") as zf:
+                        zf.writestr(f"{symbol}.xlsx", data)
+                index_success.append(symbol)
+            else:
+                index_failed.append(symbol)
+                failed_details.append((symbol, err))
+    
+    # Update global counters
+    with counter_lock:
+        success_list.extend(index_success)
+        failed_list.extend(index_failed)
+    
+    if index_success:
+        zip_buf.seek(0)
+        logger.info(f"✅ Downloaded {len(index_success)} symbols for {symbol_name}")
+        return zip_buf.read()
+    else:
+        logger.warning(f"⚠️ No data downloaded for {symbol_name}")
+        return None
+
+
 # =========================================================
 # MAIN
 # =========================================================
 def main():
+    # Initialize API
     smart = SmartConnect(api_key=ANGEL_API_KEY)
     totp = pyotp.TOTP(ANGEL_TOTP).now()
     login = smart.generateSession(ANGEL_CLIENT_ID, ANGEL_PIN, totp)
     if not login or not login.get("status"):
         raise RuntimeError("Login failed")
     
+    logger.info("✅ Login successful")
+    
+    # Load symbol master once
     df_master = load_symbol_master()
-    is_expiry, expiry = is_today_NIFTYBANK_expiry(df_master)
-    if not is_expiry:
-        logger.info("Not NIFTYBANK expiry day. Exiting.")
-        sys.exit(0)
-
-    start, end = calculate_strike_range(smart)
-    df = get_option_symbols(df_master, expiry, start, end)
-
-    FROM = (expiry - timedelta(days=90)).strftime("%Y-%m-%d 09:15")
-    TO = expiry.strftime("%Y-%m-%d 15:30")
-
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, "w") as zf:
-        pass
-
-    args = [(smart, r, FROM, TO) for _, r in df.iterrows()]
-
-    with concurrent.futures.ThreadPoolExecutor(MAX_WORKERS) as ex:
-        for symbol, data, err in ex.map(download_symbol, args):
-            if data:
-                with zipfile.ZipFile(zip_buf, "a") as zf:
-                    zf.writestr(f"{symbol}.xlsx", data)
-                success_list.append(symbol)
+    logger.info("✅ Symbol master loaded")
+    
+    # Process each index
+    for symbol_name, symbol_config in SYMBOL_CONFIG.items():
+        try:
+            zip_bytes = process_index(smart, df_master, symbol_name, symbol_config)
+            
+            if zip_bytes:
+                # Send to Telegram
+                filename = f"{symbol_name}_expiry_{datetime.now(IST).strftime('%d%m%y')}_1min.zip"
+                send_zip_to_telegram(zip_bytes, filename)
+                
+                # Also save locally for debugging
+                with open(filename, "wb") as f:
+                    f.write(zip_bytes)
+                logger.info(f"💾 Saved {filename} locally")
             else:
-                failed_list.append(symbol)
-                failed_details.append((symbol, err))
-
-    if success_list:
-        zip_buf.seek(0)
-        send_zip_to_telegram(
-            zip_buf.read(),
-            f"NIFTYBANK_expiry_{expiry.strftime('%d%m%y')}_1min.zip"
-        )
-
-    logger.info("Script completed cleanly")
-    sys.exit(0)
+                logger.info(f"📭 No data to send for {symbol_name}")
+                
+        except Exception as e:
+            logger.error(f"❌ Error processing {symbol_name}: {e}")
+            traceback.print_exc()
+            continue
+    
+    # Summary
+    logger.info(f"✅ Script completed. Success: {len(success_list)}, Failed: {len(failed_list)}")
+    
+    if failed_list:
+        logger.warning(f"Failed symbols: {failed_list[:10]}")  # Show first 10
+        if len(failed_list) > 10:
+            logger.warning(f"... and {len(failed_list) - 10} more")
 
 
 if __name__ == "__main__":
