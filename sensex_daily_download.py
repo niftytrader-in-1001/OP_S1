@@ -58,7 +58,7 @@ MAX_RETRIES = 3
 MAX_WORKERS = 3
 IST = timezone(timedelta(hours=5, minutes=30))
 
-WEEKS_FOR_RANGE = 4
+WEEKS_FOR_RANGE = 6
 SENSEX_TOKEN = "99919000"
 SENSEX_STRIKE_MULTIPLE = 100
 # =========================================================
@@ -82,7 +82,7 @@ def round_to_nearest_100(price):
 # =========================================================
 # SENSEX DATA
 # =========================================================
-def get_SENSEX_historical_data(smart_api, weeks=4):
+def get_SENSEX_historical_data(smart_api, weeks=6):
     try:
         to_date = datetime.now(IST)
         from_date = to_date - timedelta(weeks=weeks)
