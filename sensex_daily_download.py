@@ -51,6 +51,12 @@ sys.path.append(os.getcwd())   # <-- CRITICAL FIX
 from SmartApi.smartConnect import SmartConnect
 
 # =========================================================
+# TEST MODE
+# =========================================================
+TEST_MODE = True
+TEST_EXPIRY = "23-APR-2026"   # format: %d-%b-%Y
+
+# =========================================================
 # CONFIG
 # =========================================================
 API_SLEEP = 1.0
@@ -298,10 +304,34 @@ def main():
         raise RuntimeError("Login failed")
 
     df_master = load_symbol_master()
-    is_expiry, expiry = is_today_SENSEX_expiry(df_master)
-    if not is_expiry:
-        logger.info("Not SENSEX expiry day. Exiting.")
-        sys.exit(0)
+    if TEST_MODE:
+        logger.info("🧪 Running in TEST MODE (SENSEX)")
+    
+        expiry = datetime.strptime(TEST_EXPIRY, "%d-%b-%Y").date()
+    
+        df_check = df_master[
+            (df_master["Symbol"] == "BSXOPT") &
+            (df_master["Instrument"] == "OPTIDX")
+        ].copy()
+    
+        df_check["ExpiryDate"] = pd.to_datetime(
+            df_check["Expiry"],
+            format="%d-%b-%Y",
+            errors="coerce"
+        ).dt.date
+    
+        if expiry not in df_check["ExpiryDate"].values:
+            logger.error(f"❌ TEST_EXPIRY {TEST_EXPIRY} not found in symbol master")
+            sys.exit(1)
+    
+        logger.info(f"✅ Using TEST EXPIRY: {expiry}")
+    
+    else:
+        is_expiry, expiry = is_today_SENSEX_expiry(df_master)
+    
+        if not is_expiry:
+            logger.info("Not SENSEX expiry day. Exiting.")
+            sys.exit(0)
 
     start, end = calculate_strike_range(smart)
     df = get_option_symbols(df_master, expiry, start, end)
