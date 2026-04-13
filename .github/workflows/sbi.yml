@@ -1,0 +1,33 @@
+name: SBI OHLC Telegram
+
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"   # 4:00 PM IST (market close)
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install smartapi-python pyotp requests
+
+      - name: Run script
+        env:
+          ANGEL_API_KEY: ${{ secrets.ANGEL_API_KEY }}
+          ANGEL_CLIENT_ID: ${{ secrets.ANGEL_CLIENT_ID }}
+          ANGEL_PIN: ${{ secrets.ANGEL_PIN }}
+          ANGEL_TOTP: ${{ secrets.ANGEL_TOTP }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_NIFTY: ${{ secrets.TELEGRAM_CHAT_ID_NIFTY }}
+        run: python sbi_ohlc_telegram.py
