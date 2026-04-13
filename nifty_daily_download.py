@@ -55,7 +55,7 @@ from SmartApi.smartConnect import SmartConnect
 # =========================================================
 # TEST MODE
 # =========================================================
-TEST_MODE = True
+TEST_MODE = False
 TEST_EXPIRY = "21-APR-2026"   # 👈 correct format
 
 # =========================================================
