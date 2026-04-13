@@ -20,7 +20,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install smartapi-python pyotp requests
+          pip install smartapi-python
+          pip install pyotp requests logzero
 
       - name: Run script
         env:
