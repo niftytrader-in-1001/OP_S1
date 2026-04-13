@@ -53,6 +53,12 @@ sys.path.append(os.getcwd())   # <-- CRITICAL FIX
 from SmartApi.smartConnect import SmartConnect
 
 # =========================================================
+# TEST MODE
+# =========================================================
+TEST_MODE = True
+TEST_EXPIRY = "21-APR-2026"   # 👈 correct format
+
+# =========================================================
 # CONFIG
 # =========================================================
 API_SLEEP = 1.0
@@ -274,10 +280,31 @@ def main():
         raise RuntimeError("Login failed")
     
     df_master = load_symbol_master()
-    is_expiry, expiry = is_today_NIFTY_expiry(df_master)
-    if not is_expiry:
-        logger.info("Not NIFTY expiry day. Exiting.")
-        sys.exit(0)
+    
+    if TEST_MODE:
+        logger.info("🧪 Running in TEST MODE")
+    
+        expiry = datetime.strptime(TEST_EXPIRY, "%d-%b-%Y").date()
+    
+        # Check if expiry exists in symbol master
+        df_check = df_master[
+            (df_master["Symbol"] == "NIFTY") &
+            (df_master["Instrument"] == "OPTIDX")
+        ].copy()
+    
+        df_check["ExpiryDate"] = pd.to_datetime(df_check["Expiry"], format="%d-%b-%Y").dt.date
+    
+        if expiry not in df_check["ExpiryDate"].values:
+            logger.error(f"❌ TEST_EXPIRY {TEST_EXPIRY} not found in symbol master")
+            sys.exit(1)
+    
+        logger.info(f"✅ Using TEST EXPIRY: {expiry}")
+    
+    else:
+        is_expiry, expiry = is_today_NIFTY_expiry(df_master)
+        if not is_expiry:
+            logger.info("Not NIFTY expiry day. Exiting.")
+            sys.exit(0)
 
     start, end = calculate_strike_range(smart)
     df = get_option_symbols(df_master, expiry, start, end)
