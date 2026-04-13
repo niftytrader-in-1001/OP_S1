@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install smartapi-python
-          pip install pyotp requests logzero
+          pip install pyotp requests logzero websocket-client
 
       - name: Run script
         env:
