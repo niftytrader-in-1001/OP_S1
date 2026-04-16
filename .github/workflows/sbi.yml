@@ -1,4 +1,4 @@
-name: SBI OHLC Telegram
+"""name: SBI OHLC Telegram
 
 on:
   schedule:
@@ -31,4 +31,4 @@ jobs:
           ANGEL_TOTP: ${{ secrets.ANGEL_TOTP }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID_NIFTY: ${{ secrets.TELEGRAM_CHAT_ID_NIFTY }}
-        run: python sbi_ohlc_telegram.py
+        run: python sbi_ohlc_telegram.py"""
